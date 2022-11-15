@@ -20,7 +20,6 @@ segment code
 	mov     	ah,0
 	int     	10h
 
-
 ; desenha divisorias da tela 
 	; escreve nome
 	mov     	cx,27			;n�mero de caracteres
@@ -255,14 +254,258 @@ segment code
 	mov		ax,399
 	push		ax
 	call		line
+	jmp espera_mouse
 
+exit:
 	mov    	ah,08h
 	int     21h
-	mov  	ah,0   			; set video mode
+
+	mov  	ah,0   					; set video mode
 	mov  	al,[modo_anterior]   	; modo anterior
 	int  	10h
-	mov     ax,4c00h
+
+	mov     ax,4C00H ; Exit to DOS function 
 	int     21h
+
+espera_mouse:
+		;mostrando mouse na tela
+		mov ax, 01h
+		int 33h
+		
+		;lendo mouse
+		xor bx, bx
+		mov ax, 03h
+		int 33h
+
+		cmp bx, 1
+		je verifica
+		jmp espera_mouse
+
+verifica:
+		;cx -> posicao horizontal do mouse
+		;dx -> posicao vertical do mouse
+		cmp cx, 140
+		jnl espera_mouse ;se o click for abaixo da barra de funcoes, nao faz nada e volta a esperar o mouse
+		
+		;sair     	   cx < 80
+		;FIR1  	080 <= cx < 160
+		;FIR2  	160 <= cx < 240
+		;FIR3  	240 <= cx < 320
+		;load  	320 <= cx < 400
+		;abrir  	   cx > 400
+
+		cmp dx, 80
+		jl exit
+		cmp dx, 160
+		jl run_fir3
+		cmp dx, 240
+		jl run_fir2
+		cmp dx, 320
+		jl run_fir1
+		cmp dx, 400
+		jl load_data
+		jmp open_file
+
+run_fir3:
+	jmp espera_mouse
+
+run_fir2:
+	jmp espera_mouse
+
+run_fir1:
+	jmp espera_mouse
+
+load_data:
+	jmp espera_mouse
+
+open_file:
+		mov word[qtd_lida], 0
+		cmp byte[aberto],1
+		je fecha_arq_sinal
+		mov byte[aberto], 1
+		call le_arquivo
+		call imprime_grafico
+		jmp espera_mouse
+
+fecha_arq_sinal:
+	call fecha_sinal
+	mov word [aberto], 0
+	call open_file
+
+fecha_sinal:
+	mov bx, [handle]
+	mov ah, 3eh
+	int 21h ; close file...
+	ret
+
+le_arquivo:
+	mov word[qtd_lida], 0  ; reseta a quantidade lida
+	mov dx, filename ; coloca o endere�o do nome do arquivo em dx (make a pointer to the filename)
+	mov al, 0        ; modo escrita e leitura (0 - for reading. 1 - for writing. 2 - both)
+	mov ah, 3Dh      ; 3Dh of DOS Services opens a file
+	int 21h    		 ; Call DOS (interruption 21h)
+	mov [handle], ax  ; Function 3Dh returns the file handle in AX, here we save it for later use.
+	call le_numeros
+	ret
+
+le_numeros:
+	;DOS Service Function number 3Fh reads from a file.
+	mov ah, 3Fh
+	mov cx, 16         	; I will assume "sinal.txt" has at least 16 bytes in it (ex:-5.6200000e+02  ).
+	mov dx, buffer   	; DOS Functions like DX having pointers for some reason.
+	mov bx, [handle]  	; BX needs the file handle.
+	int 21h           	; call DOS
+
+	; Here we will put a $ after 4 bytes in the buffer
+	mov dx, buffer
+	add dx,ax
+	mov bx,dx
+	mov byte [bx], '$'
+
+	call get_sinal_and_convert
+
+	inc word[contador]
+	mov bx, word[qtd_pixels]
+	cmp word[contador], bx
+	jne le_numeros
+	ret
+
+sinal_negativo:
+	mov bx, word[contador]
+	mov byte[vetor_input_sn+bx], 1
+	jmp converte_str
+
+sinal_positivo:
+	mov bx, word[contador]
+	mov byte[vetor_input_sn+bx], 0
+	jmp converte_str
+
+get_sinal_and_convert:
+	xor 	ah, ah                ; limpa ah
+	mov 	al, byte[buffer] 	  ; anda 12 no vetor para ver o indice da potencia
+	cmp  	al, 45				  ; compara com (-) em ASCII
+	je sinal_negativo
+	jne sinal_positivo
+
+converte_str:
+	mov byte[buffer], 0
+	mov al, byte[buffer + 13] ; anda 12 no vetor para ver o indice da potencia
+	sub al, 30h               ; subtrai 30h do ASCII para saber o valor em decimal
+	
+	;caso e02
+	cmp al, 2
+	je calc_cem
+	
+	;caso e01
+	cmp al, 1
+	je calc_dez
+	
+	;caso e00
+	xor ah,ah                 		; limpa ah
+	mov al, byte[buffer]
+	sub al, 30h               		; subtrai 30h do ASCII para saber o valor em decimal
+	
+	mov bx, word[contador]     		; pegamos o contador para incrementar na posicao do vetor_input_mod
+	add byte[vetor_input_mod+bx], al    ; somamos o valor da parte baixa da multiplicacao de "al" no "vetor_input_mod[]"
+	jmp cvt_retorna
+
+calc_cem:
+	;lembrar de push e pop antes de multiplicar
+	push ax
+	push dx
+	
+	xor ah,ah                 ; limpa ah
+	mov al, byte[buffer]      ; al = ? (primeiro numero)
+	sub al, 30h               ; subtrai 30h do ASCII para saber o valor em decimal
+	mov  cx, 100              ; cx = 100
+	mul  cx                   ; dx:ax = ax * cx
+	
+	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao da vetor_input_mod
+	mov byte[vetor_input_mod+bx], al   ; salvamos o valor da parte baixa da multiplicacao de "al" na "vetor_input_mod[]"
+
+	xor ah,ah                 ; limpa ah
+	mov al, byte[buffer+2]    ; al = ? (segundo numero)
+	sub al, 30h               ; subtrai 30h do ASCII para saber o valor em decimal
+	mov  cx, 10               ; cx = 10
+	mul  cx                   ; dx:ax = ax * cx
+	
+	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao do vetor_input_mod
+	add byte[vetor_input_mod+bx], al   ; somamos o valor da parte baixa da multiplicacao de "al" no "vetor_input_mod[]"
+	
+	xor ah,ah                 ; limpa ah
+	mov al, byte[buffer+3]    ; al = ? (terceiro numero)
+	sub al, 30h               ; subtrai 30h do ASCII para saber o valor em decimal
+	
+	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao do vetor_input_mod
+	add byte[vetor_input_mod+bx], al   ; somamos o valor da parte baixa da multiplicacao de "al" no "vetor_input_mod[]"
+
+	pop dx                 ; volta aos valores originais
+	pop ax                 ; volta aos valores originais
+	jmp cvt_retorna
+	
+	
+calc_dez:
+	;lembrar de push e pop antes de multiplicar
+	push ax
+	push dx
+	
+	xor ah,ah                 ; limpa ah
+	mov al, byte[buffer]      ; al = ? (primeiro numero)
+	sub al, 30h               ; subtrai 30h do ASCII para saber o valor em decimal
+	mov  cx, 10               ; cx = 10
+	mul  cx                   ; dx:ax = ax * cx
+	
+	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao do vetor_input_mod
+	mov byte[vetor_input_mod+bx], al   ; salvamos o valor da parte baixa da multiplicacao de "al" no "vetor_input_mod[]"
+
+	xor ah,ah                 ; limpa ah
+	mov al, byte[buffer+2]    ; al = ? (segundo numero)
+	sub al, 30h               ; subtrai 30h do ASCII para saber o valor em decimal
+	
+	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao do vetor_input_mod
+	add byte[vetor_input_mod+bx], al   ; somamos o valor da parte baixa da multiplicacao de "al" no "vetor_input_mod[]"
+	
+	pop dx                    ; volta aos valores originais
+	pop ax                    ; volta aos valores originais
+	jmp cvt_retorna
+
+
+cvt_retorna:
+	ret
+
+imprime_grafico:
+	mov cx, 499
+	mov word[contador], 0
+imprime_num:
+	mov		ax, word[contador]
+	add		ax, 140
+	push	ax
+	call ajuste_ax
+	push	ax
+	mov ax, 1
+	push	ax
+	call	full_circle
+	inc word[contador]
+	loop imprime_num
+	ret
+
+ajuste_ax:
+	mov bx, word[contador]
+	mov ax, 0
+	mov al, byte[bx + vetor_input_sn]
+	cmp al, 0
+	je set_ax_positivo
+	jne set_ax_negativo
+
+set_ax_positivo:
+	mov ax, 364
+	add al, byte[vetor_input_mod + bx]
+	ret
+
+set_ax_negativo:
+	mov ax, 364
+	sub al, byte[vetor_input_mod + bx]
+	ret
 
 ;***************************************************************************
 ;
@@ -305,11 +548,11 @@ caracter:
 		push		si
 		push		di
 		push		bp
-    		mov     	ah,9
-    		mov     	bh,0
-    		mov     	cx,1
+    	mov     	ah,9
+    	mov     	bh,0
+    	mov     	cx,1
    		mov     	bl,[cor]
-    		int     	10h
+    	int     	10h
 		pop		bp
 		pop		di
 		pop		si
@@ -804,38 +1047,55 @@ cor		db		branco_intenso
 ;	1 1 1 0 amarelo
 ;	1 1 1 1 branco intenso
 
-preto		equ		0
-azul		equ		1
-verde		equ		2
-cyan		equ		3
-vermelho	equ		4
-magenta		equ		5
-marrom		equ		6
-branco		equ		7
-cinza		equ		8
-azul_claro	equ		9
-verde_claro	equ		10
-cyan_claro	equ		11
-rosa		equ		12
+preto			equ		0
+azul			equ		1
+verde			equ		2
+cyan			equ		3
+vermelho		equ		4
+magenta			equ		5
+marrom			equ		6
+branco			equ		7
+cinza			equ		8
+azul_claro		equ		9
+verde_claro		equ		10
+cyan_claro		equ		11
+rosa			equ		12
 magenta_claro	equ		13
-amarelo		equ		14
+amarelo			equ		14
 branco_intenso	equ		15
 
 modo_anterior	db		0
-linha   	dw  		0
-coluna  	dw  		0
-deltax		dw		0
-deltay		dw		0	
-nome_aluno    	db  		'Usiel Ferreira Lopes Junior'
-abrir_str    	db  		'Abrir'
-fir1_str    	db  		'FIR_1'
-fir2_str    	db  		'FIR_2'
-fir3_str    	db  		'FIR_3'
-sair_str    	db  		'Sair'
-seta_str    	db  		'> > >'
+linha   		dw  	0
+coluna  		dw  	0
+deltax			dw		0
+deltay			dw		0	
+nome_aluno    	db  	'Usiel Ferreira Lopes Junior'
+abrir_str    	db  	'Abrir'
+fir1_str    	db  	'FIR_1'
+fir2_str    	db  	'FIR_2'
+fir3_str    	db  	'FIR_3'
+sair_str    	db  	'Sair'
+seta_str    	db  	'> > >'
+
+filename 		db 		'sinal.txt',0
+handle 			dw 		0
+aberto 			db 		0
+qtd_lida 		dw 		0
+
+buffer 			resb 	16		
+				db 	'$'
+
+contador 		dw 		0
+contador2 		dw 		0
+sinal 			db 		0
+qtd_pixels  	dw 		500
+
+vetor_input_mod 	times 	500 	db 	0  	; Vetor Módulo
+vetor_input_sn 		times 	500 	db 	0  	; Vetor Sinal
+
 ;*************************************************************************
 segment stack stack
-    		resb 		512
+    resb 		512
 stacktop:
 
 
