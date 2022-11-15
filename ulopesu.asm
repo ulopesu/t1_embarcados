@@ -1,148 +1,272 @@
-; versão de 10/05/2007
+; versï¿½o de 10/05/2007
 ; corrigido erro de arredondamento na rotina line.
 ; circle e full_circle disponibilizados por Jefferson Moro em 10/2009
 ;
 segment code
 ..start:
-    		mov 		ax,data
-    		mov 		ds,ax
-    		mov 		ax,stack
-    		mov 		ss,ax
-    		mov 		sp,stacktop
+	mov 		ax,data
+	mov 		ds,ax
+	mov 		ax,stack
+	mov 		ss,ax
+	mov 		sp,stacktop
 
-; salvar modo corrente de video(vendo como está o modo de video da maquina)
-            mov  		ah,0Fh
-    		int  		10h
-    		mov  		[modo_anterior],al   
+; salvar modo corrente de video(vendo como estï¿½ o modo de video da maquina)
+	mov  		ah,0Fh
+	int  		10h
+	mov  		[modo_anterior],al   
 
-; alterar modo de video para gráfico 640x480 16 cores
-    	mov     	al,12h
-   		mov     	ah,0
-    	int     	10h
-		
+; alterar modo de video para grï¿½fico 640x480 16 cores
+	mov     	al,12h
+	mov     	ah,0
+	int     	10h
 
-;desenhar retas
 
-		mov		byte[cor],branco_intenso	;antenas
-		mov		ax,20
-		push		ax
-		mov		ax,400
-		push		ax
-		mov		ax,620
-		push		ax
-		mov		ax,400
-		push		ax
-		call		line
-		
-		mov		byte[cor],marrom	;antenas
-		mov		ax,130
-		push		ax
-		mov		ax,270
-		push		ax
-		mov		ax,100
-		push		ax
-		mov		ax,300
-		push		ax
-		call		line
-		
-		mov		ax,130
-		push		ax
-		mov		ax,130
-		push		ax
-		mov		ax,100
-		push		ax
-		mov		ax,100
-		push		ax
-		call		line
-		
-		
-;desenha circulos 
-		mov		byte[cor],azul	;cabeça
-		mov		ax,200
-		push		ax
-		mov		ax,200
-		push		ax
-		mov		ax,100
-		push		ax
-		call	circle
-
-		mov		byte[cor],verde	;corpo
-		mov		ax,450
-		push		ax
-		mov		ax,200
-		push		ax
-		mov		ax,190
-		push		ax
-		call	circle
-		
-		mov		ax,100	;circulos das antenas
-		push		ax
-		mov		ax,100
-		push		ax
-		mov		ax,10
-		push		ax
-		call	circle
-		
-		mov		ax,100
-		push		ax
-		mov		ax,300
-		push		ax
-		mov		ax,10
-		push		ax
-		call	circle
-		
-		mov		byte[cor],vermelho	;circulos vermelhos
-		mov		ax,500
-		push		ax
-		mov		ax,300
-		push		ax
-		mov		ax,50
-		push		ax
-		call	full_circle
-		
-		mov		ax,500
-		push		ax
-		mov		ax,100
-		push		ax
-		mov		ax,50
-		push		ax
-		call	full_circle
-		
-		mov		ax,350
-		push		ax
-		mov		ax,200
-		push		ax
-		mov		ax,50
-		push		ax
-		call	full_circle
-		
-
-;escrever uma mensagem
-
-    	mov     	cx,14			;número de caracteres
-    	mov     	bx,0
-    	mov     	dh,0			;linha 0-29
-    	mov     	dl,30			;coluna 0-79
-		mov		byte[cor],azul
-l4:
+; desenha divisorias da tela 
+	; escreve nome
+	mov     	cx,27			;nï¿½mero de caracteres
+	mov     	bx,0
+	mov     	dh,29			;linha 0-29
+	mov     	dl,35			;coluna 0-79
+	mov		byte[cor], verde_claro
+	l_w_name:
 		call	cursor
-    	mov     al,[bx+mens]
+		mov     al,[bx+nome_aluno]
 		call	caracter
-    	inc     bx			;proximo caracter
+		inc     bx			;proximo caracter
 		inc		dl			;avanca a coluna
-		inc		byte [cor]		;mudar a cor para a seguinte
-    	loop    l4
+		loop    l_w_name
 
-		mov    	ah,08h
-		int     21h
-	    mov  	ah,0   			; set video mode
-	    mov  	al,[modo_anterior]   	; modo anterior
-	    int  	10h
-		mov     ax,4c00h
-		int     21h
+	; escreve sair
+	mov     	cx,4			;nï¿½mero de caracteres
+	mov     	bx,0
+	mov     	dh,27			;linha 0-29
+	mov     	dl,6			;coluna 0-79
+	mov		byte[cor], rosa
+	l_w_sair:
+		call	cursor
+		mov     al,[bx+sair_str]
+		call	caracter
+		inc     bx			;proximo caracter
+		inc		dl			;avanca a coluna
+		loop    l_w_sair
+
+	; escreve FIR_3
+	mov     	cx,5			;nï¿½mero de caracteres
+	mov     	bx,0
+	mov     	dh,22			;linha 0-29
+	mov     	dl,6			;coluna 0-79
+	mov		byte[cor], cyan_claro
+	l_w_fir3:
+		call	cursor
+		mov     al,[bx+fir3_str]
+		call	caracter
+		inc     bx			;proximo caracter
+		inc		dl			;avanca a coluna
+		loop    l_w_fir3
+
+	; escreve FIR_2
+	mov     	cx,5			;nï¿½mero de caracteres
+	mov     	bx,0
+	mov     	dh,17			;linha 0-29
+	mov     	dl,6			;coluna 0-79
+	mov		byte[cor], amarelo
+	l_w_fir2:
+		call	cursor
+		mov     al,[bx+fir2_str]
+		call	caracter
+		inc     bx			;proximo caracter
+		inc		dl			;avanca a coluna
+		loop    l_w_fir2
+
+	; escreve FIR_1
+	mov     	cx,5			;nï¿½mero de caracteres
+	mov     	bx,0
+	mov     	dh,12			;linha 0-29
+	mov     	dl,6			;coluna 0-79
+	mov		byte[cor], magenta_claro
+	l_w_fir1:
+		call	cursor
+		mov     al,[bx+fir1_str]
+		call	caracter
+		inc     bx			;proximo caracter
+		inc		dl			;avanca a coluna
+		loop    l_w_fir1
+
+	; escreve seta
+	mov     	cx,5			;nï¿½mero de caracteres
+	mov     	bx,0
+	mov     	dh,7			;linha 0-29
+	mov     	dl,6			;coluna 0-79
+	mov		byte[cor], branco_intenso
+	l_w_seta:
+		call	cursor
+		mov     al, [bx+seta_str]
+		call	caracter
+		inc     bx			;proximo caracter
+		inc		dl			;avanca a coluna
+		loop    l_w_seta
+
+	; escreve abrir
+	mov     	cx,5			;nï¿½mero de caracteres
+	mov     	bx,0
+	mov     	dh,2			;linha 0-29
+	mov     	dl,6			;coluna 0-79
+	mov		byte[cor], verde
+	l_w_abrir:
+		call	cursor
+		mov     al,[bx+abrir_str]
+		call	caracter
+		inc     bx			;proximo caracter
+		inc		dl			;avanca a coluna
+		loop    l_w_abrir
+
+
+	; bordas externas
+	mov		byte[cor], branco_intenso
+	mov		ax,0
+	push		ax
+	mov		ax,0
+	push		ax
+	mov		ax,0
+	push		ax
+	mov		ax,479
+	push		ax
+	call		line
+
+	mov		byte[cor], branco_intenso
+	mov		ax,0
+	push		ax
+	mov		ax,0
+	push		ax
+	mov		ax,639
+	push		ax
+	mov		ax,0
+	push		ax
+	call		line
+
+	mov		byte[cor], branco_intenso
+	mov		ax,639
+	push		ax
+	mov		ax,0
+	push		ax
+	mov		ax,639
+	push		ax
+	mov		ax,479
+	push		ax
+	call		line
+
+	mov		byte[cor], branco_intenso
+	mov		ax,0
+	push		ax
+	mov		ax,479
+	push		ax
+	mov		ax,639
+	push		ax
+	mov		ax,479
+	push		ax
+	call		line
+
+	; bordas internas centrais
+	mov		byte[cor], branco_intenso
+	mov		ax,139
+	push		ax
+	mov		ax,0
+	push		ax
+	mov		ax,139
+	push		ax
+	mov		ax,479
+	push		ax
+	call		line
+
+	mov		byte[cor], branco_intenso
+	mov		ax,140
+	push		ax
+	mov		ax,19
+	push		ax
+	mov		ax,639
+	push		ax
+	mov		ax,19
+	push		ax
+	call		line
+
+	mov		byte[cor], branco_intenso
+	mov		ax,140
+	push		ax
+	mov		ax,249
+	push		ax
+	mov		ax,639
+	push		ax
+	mov		ax,249
+	push		ax
+	call		line
+
+	; bordas internas menu
+	mov		byte[cor], branco_intenso
+	mov		ax,0
+	push		ax
+	mov		ax,79
+	push		ax
+	mov		ax,139
+	push		ax
+	mov		ax,79
+	push		ax
+	call		line
+
+	mov		byte[cor], branco_intenso
+	mov		ax,0
+	push		ax
+	mov		ax,159
+	push		ax
+	mov		ax,139
+	push		ax
+	mov		ax,159
+	push		ax
+	call		line
+
+	mov		byte[cor], branco_intenso
+	mov		ax,0
+	push		ax
+	mov		ax,239
+	push		ax
+	mov		ax,139
+	push		ax
+	mov		ax,239
+	push		ax
+	call		line
+
+	mov		byte[cor], branco_intenso
+	mov		ax,0
+	push		ax
+	mov		ax,319
+	push		ax
+	mov		ax,139
+	push		ax
+	mov		ax,319
+	push		ax
+	call		line
+
+	mov		byte[cor], branco_intenso
+	mov		ax,0
+	push		ax
+	mov		ax,399
+	push		ax
+	mov		ax,139
+	push		ax
+	mov		ax,399
+	push		ax
+	call		line
+
+	mov    	ah,08h
+	int     21h
+	mov  	ah,0   			; set video mode
+	mov  	al,[modo_anterior]   	; modo anterior
+	int  	10h
+	mov     ax,4c00h
+	int     21h
+
 ;***************************************************************************
 ;
-;   função cursor
+;   funï¿½ï¿½o cursor
 ;
 ; dh = linha (0-29) e  dl=coluna  (0-79)
 cursor:
@@ -168,7 +292,7 @@ cursor:
 		ret
 ;_____________________________________________________________________________
 ;
-;   função caracter escrito na posição do cursor
+;   funï¿½ï¿½o caracter escrito na posiï¿½ï¿½o do cursor
 ;
 ; al= caracter a ser escrito
 ; cor definida na variavel cor
@@ -197,7 +321,7 @@ caracter:
 		ret
 ;_____________________________________________________________________________
 ;
-;   função plot_xy
+;   funï¿½ï¿½o plot_xy
 ;
 ; push x; push y; call plot_xy;  (x<639, y<479)
 ; cor definida na variavel cor
@@ -228,7 +352,7 @@ plot_xy:
 		pop		bp
 		ret		4
 ;_____________________________________________________________________________
-;    função circle
+;    funï¿½ï¿½o circle
 ;	 push xc; push yc; push r; call circle;  (xc+r<639,yc+r<479)e(xc-r>0,yc-r>0)
 ; cor definida na variavel cor
 circle:
@@ -272,17 +396,17 @@ circle:
 		
 	mov		di,cx
 	sub		di,1	 ;di=r-1
-	mov		dx,0  	;dx será a variável x. cx é a variavel y
+	mov		dx,0  	;dx serï¿½ a variï¿½vel x. cx ï¿½ a variavel y
 	
-;aqui em cima a lógica foi invertida, 1-r => r-1
-;e as comparações passaram a ser jl => jg, assim garante 
+;aqui em cima a lï¿½gica foi invertida, 1-r => r-1
+;e as comparaï¿½ï¿½es passaram a ser jl => jg, assim garante 
 ;valores positivos para d
 
 stay:				;loop
 	mov		si,di
 	cmp		si,0
-	jg		inf       ;caso d for menor que 0, seleciona pixel superior (não  salta)
-	mov		si,dx		;o jl é importante porque trata-se de conta com sinal
+	jg		inf       ;caso d for menor que 0, seleciona pixel superior (nï¿½o  salta)
+	mov		si,dx		;o jl ï¿½ importante porque trata-se de conta com sinal
 	sal		si,1		;multiplica por doi (shift arithmetic left)
 	add		si,3
 	add		di,si     ;nesse ponto d=d+2*dx+3
@@ -311,7 +435,7 @@ plotar:
 	mov		si,bx
 	sub		si,cx
 	push    si			;coloca a ordenada yc-y na pilha
-	call plot_xy		;toma conta do sétimo octante
+	call plot_xy		;toma conta do sï¿½timo octante
 	mov		si,ax
 	add		si,cx
 	push    si			;coloca a abcisa xc+y na pilha
@@ -356,8 +480,8 @@ plotar:
 	call plot_xy		;toma conta do quarto octante
 	
 	cmp		cx,dx
-	jb		fim_circle  ;se cx (y) está abaixo de dx (x), termina     
-	jmp		stay		;se cx (y) está acima de dx (x), continua no loop
+	jb		fim_circle  ;se cx (y) estï¿½ abaixo de dx (x), termina     
+	jmp		stay		;se cx (y) estï¿½ acima de dx (x), continua no loop
 	
 	
 fim_circle:
@@ -371,7 +495,7 @@ fim_circle:
 	pop		bp
 	ret		6
 ;-----------------------------------------------------------------------------
-;    função full_circle
+;    funï¿½ï¿½o full_circle
 ;	 push xc; push yc; push r; call full_circle;  (xc+r<639,yc+r<479)e(xc-r>0,yc-r>0)
 ; cor definida na variavel cor					  
 full_circle:
@@ -402,17 +526,17 @@ full_circle:
 		
 	mov		di,cx
 	sub		di,1	 ;di=r-1
-	mov		dx,0  	;dx será a variável x. cx é a variavel y
+	mov		dx,0  	;dx serï¿½ a variï¿½vel x. cx ï¿½ a variavel y
 	
-;aqui em cima a lógica foi invertida, 1-r => r-1
-;e as comparações passaram a ser jl => jg, assim garante 
+;aqui em cima a lï¿½gica foi invertida, 1-r => r-1
+;e as comparaï¿½ï¿½es passaram a ser jl => jg, assim garante 
 ;valores positivos para d
 
 stay_full:				;loop
 	mov		si,di
 	cmp		si,0
-	jg		inf_full       ;caso d for menor que 0, seleciona pixel superior (não  salta)
-	mov		si,dx		;o jl é importante porque trata-se de conta com sinal
+	jg		inf_full       ;caso d for menor que 0, seleciona pixel superior (nï¿½o  salta)
+	mov		si,dx		;o jl ï¿½ importante porque trata-se de conta com sinal
 	sal		si,1		;multiplica por doi (shift arithmetic left)
 	add		si,3
 	add		di,si     ;nesse ponto d=d+2*dx+3
@@ -485,8 +609,8 @@ plotar_full:
 	call	line
 	
 	cmp		cx,dx
-	jb		fim_full_circle  ;se cx (y) está abaixo de dx (x), termina     
-	jmp		stay_full		;se cx (y) está acima de dx (x), continua no loop
+	jb		fim_full_circle  ;se cx (y) estï¿½ abaixo de dx (x), termina     
+	jmp		stay_full		;se cx (y) estï¿½ acima de dx (x), continua no loop
 	
 	
 fim_full_circle:
@@ -501,7 +625,7 @@ fim_full_circle:
 	ret		6
 ;-----------------------------------------------------------------------------
 ;
-;   função line
+;   funï¿½ï¿½o line
 ;
 ; push x1; push y1; push x2; push y2; call line;  (x<639, y<479)
 line:
@@ -539,7 +663,7 @@ line31:		inc		bx
 		jmp		line3
 ;deltax <>0
 line1:
-; comparar módulos de deltax e deltay sabendo que cx>ax
+; comparar mï¿½dulos de deltax e deltay sabendo que cx>ax
 	; cx > ax
 		push		cx
 		sub		cx,ax
@@ -614,9 +738,6 @@ line7:
 		sub		dx,bx
 		mov		[deltay],dx
 		pop		dx
-
-
-
 		mov		si,bx
 line6:
 		push		dx
@@ -705,7 +826,13 @@ linha   	dw  		0
 coluna  	dw  		0
 deltax		dw		0
 deltay		dw		0	
-mens    	db  		'Funcao Grafica'
+nome_aluno    	db  		'Usiel Ferreira Lopes Junior'
+abrir_str    	db  		'Abrir'
+fir1_str    	db  		'FIR_1'
+fir2_str    	db  		'FIR_2'
+fir3_str    	db  		'FIR_3'
+sair_str    	db  		'Sair'
+seta_str    	db  		'> > >'
 ;*************************************************************************
 segment stack stack
     		resb 		512
