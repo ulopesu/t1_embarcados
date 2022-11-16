@@ -19,7 +19,11 @@ segment code
 	mov     	al,12h
 	mov     	ah,0
 	int     	10h
+	call desenha_layout
+	jmp espera_mouse
+	; jmp read_file			APENAS PARA TESTAR DIRETAMENTE A FUNÇÃO
 
+desenha_layout:
 ; desenha divisorias da tela 
 	; escreve nome
 	mov     	cx,27			;n�mero de caracteres
@@ -167,18 +171,18 @@ segment code
 
 	; bordas internas centrais
 	mov		byte[cor], branco_intenso
-	mov		ax,139
+	mov		ax,138
 	push		ax
 	mov		ax,0
 	push		ax
-	mov		ax,139
+	mov		ax,138
 	push		ax
 	mov		ax,479
 	push		ax
 	call		line
 
 	mov		byte[cor], branco_intenso
-	mov		ax,140
+	mov		ax,139
 	push		ax
 	mov		ax,19
 	push		ax
@@ -189,7 +193,7 @@ segment code
 	call		line
 
 	mov		byte[cor], branco_intenso
-	mov		ax,140
+	mov		ax,139
 	push		ax
 	mov		ax,249
 	push		ax
@@ -205,7 +209,7 @@ segment code
 	push		ax
 	mov		ax,79
 	push		ax
-	mov		ax,139
+	mov		ax,138
 	push		ax
 	mov		ax,79
 	push		ax
@@ -216,7 +220,7 @@ segment code
 	push		ax
 	mov		ax,159
 	push		ax
-	mov		ax,139
+	mov		ax,138
 	push		ax
 	mov		ax,159
 	push		ax
@@ -227,7 +231,7 @@ segment code
 	push		ax
 	mov		ax,239
 	push		ax
-	mov		ax,139
+	mov		ax,138
 	push		ax
 	mov		ax,239
 	push		ax
@@ -238,7 +242,7 @@ segment code
 	push		ax
 	mov		ax,319
 	push		ax
-	mov		ax,139
+	mov		ax,138
 	push		ax
 	mov		ax,319
 	push		ax
@@ -249,16 +253,97 @@ segment code
 	push		ax
 	mov		ax,399
 	push		ax
-	mov		ax,139
+	mov		ax,138
 	push		ax
 	mov		ax,399
 	push		ax
 	call		line
-	jmp espera_mouse
+	ret
+
+limpar_areas:
+	call limpar_area1
+	call limpar_area2
+	ret
+
+limpar_area1:
+	push ax
+	push bx
+	push cx
+	mov word[contador], 0     ; resetamos o contador
+	mov	byte[cor],preto
+		loop_limpar_area1:
+			mov bx, word[contador]
+			cmp bx, 228
+			je volta_limpa
+		
+			;x1 ->  139
+			mov		ax, 139   ;->x1
+			push	ax
+		
+			;y1 = [478 - contador] -> comeca em 478 e vai subtraindo o contador...
+			xor cx, cx
+			mov cx, 478
+			sub cx, bx
+			mov	ax, cx     ;->y1
+			push ax
+		
+			;x2 = 638
+			xor ax, ax
+			add ax, 638
+			push ax
+		
+			;y2 = y1
+			mov	ax, cx     ;->y2=y1
+			push ax
+			call line
+		
+			inc word[contador]
+			jmp loop_limpar_area1
+
+limpar_area2:
+	push ax
+	push bx
+	push cx
+	mov word[contador], 0     ; resetamos o contador
+	mov	byte[cor],preto
+		loop_limpar_area2:
+			mov bx, word[contador]
+			cmp bx, 228
+			je volta_limpa
+		
+			;x1 ->  139
+			mov		ax, 139   ;->x1
+			push	ax
+		
+			;y1 = [478 - contador] -> comeca em 478 e vai subtraindo o contador...
+			xor cx, cx
+			mov cx, 248
+			sub cx, bx
+			mov	ax, cx     ;->y1
+			push ax
+		
+			;x2 = 638
+			xor ax, ax
+			add ax, 638
+			push ax
+		
+			;y2 = y1
+			mov	ax, cx     ;->y2=y1
+			push ax
+			call line
+
+			inc word[contador]
+			jmp loop_limpar_area2
+
+volta_limpa:
+	pop ax
+	pop bx
+	pop cx
+	ret
 
 exit:
-	mov    	ah,08h
-	int     21h
+	; mov    	ah,08h
+	; int     21h
 
 	mov  	ah,0   					; set video mode
 	mov  	al,[modo_anterior]   	; modo anterior
@@ -282,29 +367,23 @@ espera_mouse:
 		jmp espera_mouse
 
 verifica:
-		;cx -> posicao horizontal do mouse
-		;dx -> posicao vertical do mouse
-		cmp cx, 140
-		jnl espera_mouse ;se o click for abaixo da barra de funcoes, nao faz nada e volta a esperar o mouse
-		
-		;sair     	   cx < 80
-		;FIR1  	080 <= cx < 160
-		;FIR2  	160 <= cx < 240
-		;FIR3  	240 <= cx < 320
-		;load  	320 <= cx < 400
-		;abrir  	   cx > 400
-
-		cmp dx, 80
-		jl exit
-		cmp dx, 160
-		jl run_fir3
-		cmp dx, 240
-		jl run_fir2
-		cmp dx, 320
-		jl run_fir1
-		cmp dx, 400
-		jl load_data
-		jmp open_file
+	;cx -> posicao horizontal do mouse
+	;dx -> posicao vertical do mouse	(INVERTIDO)
+	cmp cx, 140
+	jnl espera_mouse ;se o click ocorrer fora da barra de funcoes, nao faz nada e volta a esperar o mouse
+	cmp dx, 80
+	jl read_file	;abrir     	   dx < 80
+	cmp dx, 160
+	jl load_data	;load  	080 <= dx < 160
+	cmp dx, 240
+	jl run_fir1		;FIR3  	160 <= dx < 240
+	cmp dx, 320
+	jl run_fir2		;FIR2  	240 <= dx < 320
+	cmp dx, 400
+	jl run_fir3		;FIR1  	320 <= dx < 400
+	cmp dx, 480
+	jl exit			;sair  	   dx > 400
+	jmp espera_mouse
 
 run_fir3:
 	jmp espera_mouse
@@ -316,58 +395,66 @@ run_fir1:
 	jmp espera_mouse
 
 load_data:
+	call le_numeros
+	call limpar_area1
+	call imprime_entrada
 	jmp espera_mouse
 
-open_file:
-		mov word[qtd_lida], 0
-		cmp byte[aberto],1
-		je fecha_arq_sinal
-		mov byte[aberto], 1
-		call le_arquivo
-		call imprime_grafico
-		jmp espera_mouse
+read_file:
+	cmp byte[aberto],1
+	je fecha_arq_sinal
+	mov byte[aberto], 1
+	call open_file
+	call le_numeros
+	call imprime_entrada
+	jmp espera_mouse
 
 fecha_arq_sinal:
-	call fecha_sinal
+	call close_file
 	mov word [aberto], 0
-	call open_file
+	call limpar_areas
+	call read_file
 
-fecha_sinal:
+open_file:
+	mov word[qtd_lida], 0  	; reseta a quantidade lida
+	mov dx, filename 		; coloca o endere�o do nome do arquivo em dx (make a pointer to the filename)
+	mov al, 0        		; modo escrita e leitura (0 - for reading. 1 - for writing. 2 - both)
+	mov ah, 3Dh      		; 3Dh of DOS Services opens a file
+	int 21h    		 		; Call DOS (interruption 21h)
+	mov [handle], ax  		; Function 3Dh returns the file handle in AX, here we save it for later use.
+	ret
+
+close_file:
 	mov bx, [handle]
 	mov ah, 3eh
 	int 21h ; close file...
 	ret
 
-le_arquivo:
-	mov word[qtd_lida], 0  ; reseta a quantidade lida
-	mov dx, filename ; coloca o endere�o do nome do arquivo em dx (make a pointer to the filename)
-	mov al, 0        ; modo escrita e leitura (0 - for reading. 1 - for writing. 2 - both)
-	mov ah, 3Dh      ; 3Dh of DOS Services opens a file
-	int 21h    		 ; Call DOS (interruption 21h)
-	mov [handle], ax  ; Function 3Dh returns the file handle in AX, here we save it for later use.
-	call le_numeros
-	ret
-
 le_numeros:
-	;DOS Service Function number 3Fh reads from a file.
-	mov ah, 3Fh
-	mov cx, 16         	; I will assume "sinal.txt" has at least 16 bytes in it (ex:-5.6200000e+02  ).
-	mov dx, buffer   	; DOS Functions like DX having pointers for some reason.
-	mov bx, [handle]  	; BX needs the file handle.
-	int 21h           	; call DOS
+	mov word[contador], 0
+	loop_le_numeros:
+		;DOS Service Function number 3Fh reads from a file.
+		mov ah, 3Fh
+		mov cx, 16         	; I will assume "sinal.txt" has at least 16 bytes in it (ex:-5.6200000e+02  ).
+		mov dx, buffer   	; DOS Functions like DX having pointers for some reason.
+		mov bx, [handle]  	; BX needs the file handle.
+		int 21h           	; call DOS
 
-	; Here we will put a $ after 4 bytes in the buffer
-	mov dx, buffer
-	add dx,ax
-	mov bx,dx
-	mov byte [bx], '$'
+		; Here we will put a $ after 4 bytes in the buffer
+		mov dx, buffer
+		add dx,ax
+		mov bx,dx
+		mov byte [bx], '$'
 
-	call get_sinal_and_convert
+		call get_sinal_and_convert
 
-	inc word[contador]
-	mov bx, word[qtd_pixels]
-	cmp word[contador], bx
-	jne le_numeros
+		inc word[contador]
+		mov bx, word[qtd_pixels]
+		cmp word[contador], bx
+		jne loop_le_numeros
+		je  volta_le_numeros
+
+volta_le_numeros:
 	ret
 
 sinal_negativo:
@@ -382,13 +469,13 @@ sinal_positivo:
 
 get_sinal_and_convert:
 	xor 	ah, ah                ; limpa ah
-	mov 	al, byte[buffer] 	  ; anda 12 no vetor para ver o indice da potencia
+	mov 	al, byte[buffer] 	  ; pega o primeiro valor do buffer, que indica o sinal (+ ou -)
 	cmp  	al, 45				  ; compara com (-) em ASCII
 	je sinal_negativo
 	jne sinal_positivo
 
 converte_str:
-	mov byte[buffer], 0
+	mov byte[buffer], 30h
 	mov al, byte[buffer + 13] ; anda 12 no vetor para ver o indice da potencia
 	sub al, 30h               ; subtrai 30h do ASCII para saber o valor em decimal
 	
@@ -473,9 +560,10 @@ calc_dez:
 cvt_retorna:
 	ret
 
-imprime_grafico:
+imprime_entrada:
 	mov cx, 499
 	mov word[contador], 0
+	mov	byte[cor],branco_intenso
 imprime_num:
 	mov		ax, word[contador]
 	add		ax, 140
