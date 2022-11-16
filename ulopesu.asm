@@ -95,19 +95,21 @@ desenha_layout:
 		inc		dl			;avanca a coluna
 		loop    l_w_fir1
 
-	; escreve seta
+	; escreve setas 1
 	mov     	cx,5			;n�mero de caracteres
 	mov     	bx,0
-	mov     	dh,7			;linha 0-29
+	mov     	dh,6			;linha 0-29
 	mov     	dl,6			;coluna 0-79
 	mov		byte[cor], branco_intenso
-	l_w_seta:
-		call	cursor
-		mov     al, [bx+seta_str]
-		call	caracter
-		inc     bx			;proximo caracter
-		inc		dl			;avanca a coluna
-		loop    l_w_seta
+	call l_w_seta
+
+	; escreve setas 2
+	mov     	cx,5			;n�mero de caracteres
+	mov     	bx,0
+	mov     	dh,8			;linha 0-29
+	mov     	dl,6			;coluna 0-79
+	mov		byte[cor], branco_intenso
+	call l_w_seta
 
 	; escreve abrir
 	mov     	cx,5			;n�mero de caracteres
@@ -260,6 +262,15 @@ desenha_layout:
 	call		line
 	ret
 
+l_w_seta:
+	call	cursor
+	mov     al, [bx+seta_str]
+	call	caracter
+	inc     bx			;proximo caracter
+	inc		dl			;avanca a coluna
+	loop    l_w_seta
+	ret
+
 limpar_areas:
 	call limpar_area1
 	call limpar_area2
@@ -336,9 +347,9 @@ limpar_area2:
 			jmp loop_limpar_area2
 
 volta_limpa:
-	pop ax
-	pop bx
 	pop cx
+	pop bx
+	pop ax
 	ret
 
 exit:
@@ -395,9 +406,11 @@ run_fir1:
 	jmp espera_mouse
 
 load_data:
+	cmp byte[aberto],0
+	je read_file
 	call le_numeros
 	call limpar_area1
-	call imprime_entrada
+	call plotar_entrada
 	jmp espera_mouse
 
 read_file:
@@ -406,13 +419,13 @@ read_file:
 	mov byte[aberto], 1
 	call open_file
 	call le_numeros
-	call imprime_entrada
+	call plotar_entrada
 	jmp espera_mouse
 
 fecha_arq_sinal:
 	call close_file
 	mov word [aberto], 0
-	call limpar_areas
+	call limpar_area1
 	call read_file
 
 open_file:
@@ -433,12 +446,18 @@ close_file:
 le_numeros:
 	mov word[contador], 0
 	loop_le_numeros:
-		;DOS Service Function number 3Fh reads from a file.
-		mov ah, 3Fh
+		;DOS Service Function number 3FH reads from a file.
+		mov ah, 3FH
 		mov cx, 16         	; I will assume "sinal.txt" has at least 16 bytes in it (ex:-5.6200000e+02  ).
 		mov dx, buffer   	; DOS Functions like DX having pointers for some reason.
 		mov bx, [handle]  	; BX needs the file handle.
 		int 21h           	; call DOS
+
+		; verifica se o final do arquivo foi encontrado 
+		cmp ax, cx ;EOF reached?
+		jne EOF
+
+		inc word[qtd_lida]
 
 		; Here we will put a $ after 4 bytes in the buffer
 		mov dx, buffer
@@ -450,12 +469,25 @@ le_numeros:
 
 		inc word[contador]
 		mov bx, word[qtd_pixels]
+
+		; verifica se os 500 números já foram lidos
 		cmp word[contador], bx
 		jne loop_le_numeros
 		je  volta_le_numeros
 
 volta_le_numeros:
+	call imprime_qtd_lida
 	ret
+
+imprime_qtd_lida:
+	push ax
+	mov ax, word[qtd_lida]
+	call print_dw_number
+	pop ax
+	ret
+
+EOF:
+	jmp read_file	;	COMEÇA A LEITURA DO ARQUIVO DESDE O INÍCIO
 
 sinal_negativo:
 	mov bx, word[contador]
@@ -502,7 +534,7 @@ calc_cem:
 	push dx
 	
 	xor ah,ah                 ; limpa ah
-	mov al, byte[buffer]      ; al = ? (primeiro numero)
+	mov al, byte[buffer+1]      ; al = ? (primeiro numero)
 	sub al, 30h               ; subtrai 30h do ASCII para saber o valor em decimal
 	mov  cx, 100              ; cx = 100
 	mul  cx                   ; dx:ax = ax * cx
@@ -511,7 +543,7 @@ calc_cem:
 	mov byte[vetor_input_mod+bx], al   ; salvamos o valor da parte baixa da multiplicacao de "al" na "vetor_input_mod[]"
 
 	xor ah,ah                 ; limpa ah
-	mov al, byte[buffer+2]    ; al = ? (segundo numero)
+	mov al, byte[buffer+3]    ; al = ? (segundo numero)
 	sub al, 30h               ; subtrai 30h do ASCII para saber o valor em decimal
 	mov  cx, 10               ; cx = 10
 	mul  cx                   ; dx:ax = ax * cx
@@ -520,7 +552,7 @@ calc_cem:
 	add byte[vetor_input_mod+bx], al   ; somamos o valor da parte baixa da multiplicacao de "al" no "vetor_input_mod[]"
 	
 	xor ah,ah                 ; limpa ah
-	mov al, byte[buffer+3]    ; al = ? (terceiro numero)
+	mov al, byte[buffer+4]    ; al = ? (terceiro numero)
 	sub al, 30h               ; subtrai 30h do ASCII para saber o valor em decimal
 	
 	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao do vetor_input_mod
@@ -537,7 +569,7 @@ calc_dez:
 	push dx
 	
 	xor ah,ah                 ; limpa ah
-	mov al, byte[buffer]      ; al = ? (primeiro numero)
+	mov al, byte[buffer+1]      ; al = ? (primeiro numero)
 	sub al, 30h               ; subtrai 30h do ASCII para saber o valor em decimal
 	mov  cx, 10               ; cx = 10
 	mul  cx                   ; dx:ax = ax * cx
@@ -546,7 +578,7 @@ calc_dez:
 	mov byte[vetor_input_mod+bx], al   ; salvamos o valor da parte baixa da multiplicacao de "al" no "vetor_input_mod[]"
 
 	xor ah,ah                 ; limpa ah
-	mov al, byte[buffer+2]    ; al = ? (segundo numero)
+	mov al, byte[buffer+3]    ; al = ? (segundo numero)
 	sub al, 30h               ; subtrai 30h do ASCII para saber o valor em decimal
 	
 	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao do vetor_input_mod
@@ -560,11 +592,12 @@ calc_dez:
 cvt_retorna:
 	ret
 
-imprime_entrada:
+plotar_entrada:
 	mov cx, 499
 	mov word[contador], 0
 	mov	byte[cor],branco_intenso
-imprime_num:
+
+plot_num:
 	mov		ax, word[contador]
 	add		ax, 140
 	push	ax
@@ -574,7 +607,7 @@ imprime_num:
 	push	ax
 	call	full_circle
 	inc word[contador]
-	loop imprime_num
+	loop plot_num
 	ret
 
 ajuste_ax:
@@ -593,6 +626,69 @@ set_ax_positivo:
 set_ax_negativo:
 	mov ax, 364
 	sub al, byte[vetor_input_mod + bx]
+	ret
+
+;	imprime, em decimal, o valor númerico de AX 
+print_dw_number:
+    ;initialize count
+	push bx
+	push cx
+	push dx
+
+	mov word[contador], 0
+    mov cx,0
+    mov dx,0
+    loop_print_dw_number:
+        cmp ax,0
+        je print1     	; if ax is zero
+        mov bx,10     	; initialize bx to 10  
+        div bx    		; extract the last digit             
+        push dx    		; push it in the stack         
+        inc cx   		; increment the count          
+        xor dx,dx		; set dx to 0
+        jmp loop_print_dw_number
+    print1:
+        cmp cx,0
+        je volta_print	; if cx is zero
+        pop dx			; pop the top of stack
+
+        ;add 48 so that it
+        ;represents the ASCII
+        ;value of digits
+        add dx, 48
+
+		; 	imprime DX
+		push ax
+		push bx
+		push cx
+		mov ax, dx
+		push dx
+
+		mov     	dh, 7			;linha 0-29
+		mov     	dl, 6			;coluna 0-79
+		mov			byte[cor], branco_intenso
+		add			dl, byte[contador]
+
+		call	cursor
+		call	caracter
+		inc		dl
+		call	cursor
+		mov     al, ah
+		call	caracter
+
+		pop dx
+		pop cx
+		pop bx
+		pop ax
+		; 	FIM imprime DX
+
+		inc word[contador]
+        dec cx			;decrease the count
+        jmp print1
+volta_print:
+	pop dx
+	pop cx
+	pop bx
 	ret
 
 ;***************************************************************************
