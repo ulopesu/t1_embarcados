@@ -396,13 +396,14 @@ verifica:
 	jl exit			;sair  	   dx > 400
 	jmp espera_mouse
 
-run_fir3:
-	jmp espera_mouse
-
-run_fir2:
-	jmp espera_mouse
-
-run_fir1:
+read_file:
+	cmp byte[aberto],1
+	je fecha_arq_sinal
+	mov byte[aberto], 1
+	call open_file
+	call le_numeros
+	call config_plotar_entrada
+	call plotar_vetor
 	jmp espera_mouse
 
 load_data:
@@ -410,16 +411,33 @@ load_data:
 	je read_file
 	call le_numeros
 	call limpar_area1
-	call plotar_entrada
+	call config_plotar_entrada
+	call plotar_vetor
 	jmp espera_mouse
 
-read_file:
-	cmp byte[aberto],1
-	je fecha_arq_sinal
-	mov byte[aberto], 1
-	call open_file
-	call le_numeros
-	call plotar_entrada
+run_fir1:
+	; copy filter 
+	mov word[contador], 0
+	loop_copy_f1:
+		mov bx, word[contador]
+		mov cl, byte[filtro1 + bx]
+		mov byte[f_select + bx], cl
+		inc word[contador]
+		mov bx, word[contador]
+		cmp bl, byte[filtros_len]
+		jl loop_copy_f1
+	mov bl, byte[filtro1_div]
+	mov byte[f_select_div], bl
+	call aplicar_filtro
+	call ajustar_vout
+	; call config_plotar_saida
+	; call plotar_vetor
+	jmp espera_mouse
+
+run_fir2:
+	jmp espera_mouse
+
+run_fir3:
 	jmp espera_mouse
 
 fecha_arq_sinal:
@@ -491,12 +509,12 @@ EOF:
 
 sinal_negativo:
 	mov bx, word[contador]
-	mov byte[vetor_input_sn+bx], 1
+	mov byte[v_in_sn+bx], 1
 	jmp converte_str
 
 sinal_positivo:
 	mov bx, word[contador]
-	mov byte[vetor_input_sn+bx], 0
+	mov byte[v_in_sn+bx], 0
 	jmp converte_str
 
 get_sinal_and_convert:
@@ -505,6 +523,147 @@ get_sinal_and_convert:
 	cmp  	al, 45				  ; compara com (-) em ASCII
 	je sinal_negativo
 	jne sinal_positivo
+
+;	f1[qtd_pixels] * f1[filtros_len]
+aplicar_filtro:
+	mov word[contador], 0
+	l1_aplicar_filtro:
+		mov bx, word[contador]
+		mov word[v_out_mod + bx], 0
+		mov ax,  0					;	set x_start
+		mov bx, word[filtros_len]
+		neg bx
+		add bx, word[contador]
+		add bx, 1
+		call max_ax_bx 
+		mov word[x_start], cx
+		mov ax, [contador]			;	set x_end
+		add ax, 1
+		mov bx, [qtd_pixels]
+		call min_ax_bx
+		mov word[x_end], cx
+		mov ax, word[contador]		;	set h_start
+		mov bx, [filtros_len]
+		sub bx, 1
+		call min_ax_bx
+		mov[h_start], cx
+		mov ax, word[x_start]		; 	inicio loop_2
+		mov word[contador2], ax
+		l2_aplicar_filtro:
+			call conv_vin_filtro
+			inc word[contador2]			;	fim l2_aplicar_filtro
+			mov bx, word[x_end]
+			cmp word[contador2], bx
+			jl l2_aplicar_filtro
+		inc word[contador]				;	fim l1_aplicar_filtro
+		mov bx, word[qtd_pixels]
+		cmp word[contador], bx
+		jl l1_aplicar_filtro
+		ret
+
+conv_vin_filtro:
+	mov bx, word[h_start]
+	mov ax, [f_select + bx]
+	mov bx, word[contador2]
+	mov cx, [v_in_mod + bx]
+	call aplicar_sn_cx			; aplicar o sinal [v_in_sn + bx] a cx
+	imul cx
+	add word[v_out_mod + bx], ax
+	dec word[h_start]			; decrementa h_start
+	ret
+
+neg_cx:
+	neg cx
+	ret
+
+aplicar_sn_cx:
+	mov cx, [v_in_sn + bx]
+	cmp cx, 0
+	jne neg_cx
+	ret
+
+set_cx_ax:
+	mov cx, ax
+	ret
+
+set_cx_bx:
+	mov cx, bx
+	ret
+
+min_ax_bx:			; MIN(AX, BX) -> CX
+	cmp ax, bx
+	jl set_cx_ax
+	jmp set_cx_bx
+
+max_ax_bx:			; MAX(AX, BX) -> CX
+	cmp ax, bx
+	jg set_cx_ax
+	jmp set_cx_bx
+
+ajustar_vout:
+	mov word[contador], 0
+	loop_as_vout:
+		mov bx, word[contador]
+		call set_sn_vout
+		call set_mod_vout
+		; fim loop_as_vout
+		inc word[contador]
+		mov bx, word[qtd_pixels]
+		cmp word[contador], bx
+		jl loop_as_vout
+		je ret_ajustar_vout
+ret_ajustar_vout:
+	ret
+
+corrige_sn_vout_neg:
+	mov byte[v_out_sn + bx], 1
+	mov cl, byte[v_out_mod + bx]
+	neg cl
+	mov byte[v_out_mod + bx], cl
+	ret
+
+set_sn_vout:
+	cmp byte[v_out_mod + bx], 0
+	jl corrige_sn_vout_neg
+	mov byte[v_out_sn + bx], 0
+	ret
+
+set_mod_vout:
+	mov al, byte[v_out_mod + bx]
+	mov	cl, byte[f_select_div]
+	mov dx, 0
+	div cl
+	mov byte[v_out_mod + bx], al
+	ret
+
+config_plotar_entrada:
+	;	Configurações para  a função plotar
+	mov word[contador], 0
+	loop_config1:
+		mov bx, word[contador]
+		mov al, byte[v_in_mod + bx]
+		mov byte[v_select_mod + bx], al
+		mov al, byte[v_in_sn + bx]
+		mov byte[v_select_sn + bx], al
+		inc word[contador]
+		cmp bx, word[qtd_pixels]
+		jl loop_config1
+	mov word[ponto_central], 364
+	ret
+
+config_plotar_saida:
+	mov word[contador], 0
+	loop_config2:
+		mov bx, word[contador]
+		mov al, byte[v_out_mod + bx]
+		mov byte[v_select_mod + bx], al
+		mov al, byte[v_out_sn + bx]
+		mov byte[v_select_sn + bx], al
+		inc word[contador]
+		cmp bx, word[qtd_pixels]
+		jl loop_config2
+	mov word[ponto_central], 133
+	ret
 
 converte_str:
 	mov byte[buffer], 30h
@@ -524,8 +683,8 @@ converte_str:
 	mov al, byte[buffer]
 	sub al, 30h               		; subtrai 30h do ASCII para saber o valor em decimal
 	
-	mov bx, word[contador]     		; pegamos o contador para incrementar na posicao do vetor_input_mod
-	add byte[vetor_input_mod+bx], al    ; somamos o valor da parte baixa da multiplicacao de "al" no "vetor_input_mod[]"
+	mov bx, word[contador]     		; pegamos o contador para incrementar na posicao do v_in_mod
+	add byte[v_in_mod+bx], al    ; somamos o valor da parte baixa da multiplicacao de "al" no "v_in_mod[]"
 	jmp cvt_retorna
 
 calc_cem:
@@ -539,8 +698,8 @@ calc_cem:
 	mov  cx, 100              ; cx = 100
 	mul  cx                   ; dx:ax = ax * cx
 	
-	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao da vetor_input_mod
-	mov byte[vetor_input_mod+bx], al   ; salvamos o valor da parte baixa da multiplicacao de "al" na "vetor_input_mod[]"
+	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao da v_in_mod
+	mov byte[v_in_mod+bx], al   ; salvamos o valor da parte baixa da multiplicacao de "al" na "v_in_mod[]"
 
 	xor ah,ah                 ; limpa ah
 	mov al, byte[buffer+3]    ; al = ? (segundo numero)
@@ -548,15 +707,15 @@ calc_cem:
 	mov  cx, 10               ; cx = 10
 	mul  cx                   ; dx:ax = ax * cx
 	
-	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao do vetor_input_mod
-	add byte[vetor_input_mod+bx], al   ; somamos o valor da parte baixa da multiplicacao de "al" no "vetor_input_mod[]"
+	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao do v_in_mod
+	add byte[v_in_mod+bx], al   ; somamos o valor da parte baixa da multiplicacao de "al" no "v_in_mod[]"
 	
 	xor ah,ah                 ; limpa ah
 	mov al, byte[buffer+4]    ; al = ? (terceiro numero)
 	sub al, 30h               ; subtrai 30h do ASCII para saber o valor em decimal
 	
-	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao do vetor_input_mod
-	add byte[vetor_input_mod+bx], al   ; somamos o valor da parte baixa da multiplicacao de "al" no "vetor_input_mod[]"
+	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao do v_in_mod
+	add byte[v_in_mod+bx], al   ; somamos o valor da parte baixa da multiplicacao de "al" no "v_in_mod[]"
 
 	pop dx                 ; volta aos valores originais
 	pop ax                 ; volta aos valores originais
@@ -574,26 +733,26 @@ calc_dez:
 	mov  cx, 10               ; cx = 10
 	mul  cx                   ; dx:ax = ax * cx
 	
-	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao do vetor_input_mod
-	mov byte[vetor_input_mod+bx], al   ; salvamos o valor da parte baixa da multiplicacao de "al" no "vetor_input_mod[]"
+	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao do v_in_mod
+	mov byte[v_in_mod+bx], al   ; salvamos o valor da parte baixa da multiplicacao de "al" no "v_in_mod[]"
 
 	xor ah,ah                 ; limpa ah
 	mov al, byte[buffer+3]    ; al = ? (segundo numero)
 	sub al, 30h               ; subtrai 30h do ASCII para saber o valor em decimal
 	
-	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao do vetor_input_mod
-	add byte[vetor_input_mod+bx], al   ; somamos o valor da parte baixa da multiplicacao de "al" no "vetor_input_mod[]"
+	mov bx, word[contador]    ; pegamos o contador para incrementar na posicao do v_in_mod
+	add byte[v_in_mod+bx], al   ; somamos o valor da parte baixa da multiplicacao de "al" no "v_in_mod[]"
 	
 	pop dx                    ; volta aos valores originais
 	pop ax                    ; volta aos valores originais
 	jmp cvt_retorna
 
-
 cvt_retorna:
 	ret
 
-plotar_entrada:
-	mov cx, 499
+plotar_vetor:
+	mov cx, word[qtd_pixels]
+	sub cx, 1
 	mov word[contador], 0
 	mov	byte[cor],branco_intenso
 
@@ -613,19 +772,19 @@ plot_num:
 ajuste_ax:
 	mov bx, word[contador]
 	mov ax, 0
-	mov al, byte[bx + vetor_input_sn]
+	mov al, byte[v_select_sn + bx]
 	cmp al, 0
 	je set_ax_positivo
 	jne set_ax_negativo
 
 set_ax_positivo:
-	mov ax, 364
-	add al, byte[vetor_input_mod + bx]
+	mov ax, word[ponto_central]
+	add al, byte[v_select_mod + bx]
 	ret
 
 set_ax_negativo:
-	mov ax, 364
-	sub al, byte[vetor_input_mod + bx]
+	mov ax, word[ponto_central]
+	sub al, byte[v_select_mod + bx]
 	ret
 
 ;	imprime, em decimal, o valor númerico de AX 
@@ -909,8 +1068,8 @@ plotar:
 	cmp		cx,dx
 	jb		fim_circle  ;se cx (y) est� abaixo de dx (x), termina     
 	jmp		stay		;se cx (y) est� acima de dx (x), continua no loop
-	
-	
+
+
 fim_circle:
 	pop		di
 	pop		si
@@ -1211,6 +1370,7 @@ fim_line:
 ;*******************************************************************
 segment data
 
+
 cor		db		branco_intenso
 
 ;	I R G B COR
@@ -1267,15 +1427,44 @@ aberto 			db 		0
 qtd_lida 		dw 		0
 
 buffer 			resb 	16		
-				db 	'$'
+				db 		'$'
 
 contador 		dw 		0
 contador2 		dw 		0
 sinal 			db 		0
 qtd_pixels  	dw 		500
 
-vetor_input_mod 	times 	500 	db 	0  	; Vetor Módulo
-vetor_input_sn 		times 	500 	db 	0  	; Vetor Sinal
+v_in_mod 		times 	500 	db 	0  	; Vetor Módulo
+v_in_sn 		times 	500		db 	0  	; Vetor Sinal
+
+v_out_mod 		times 	500		db 	0  	; Vetor Módulo
+v_out_sn 		times 	500		db 	0  	; Vetor Saída
+
+v_select_mod 	times 	500		db 	0  	; Vetor Módulo
+v_select_sn		times 	500		db 	0  	; Vetor Saída
+
+ponto_central	dw 		0
+
+; 	Obs o tamanho de v_out pode ir até  len(v_in) + len(filtro) - 1,
+; 	neste caso 510, mascomo vamos plotar apenas 500 pixels 
+;	não faz sentido realizar o calculo de convolução até o final.
+
+filtros_len 	db 		11
+filtro1 		db 		1,1,1,1,1,1,1,1,1,1,1
+filtro1_div		db  	11
+
+filtro2 		db 		1,1,1,1,2,2,2,1,1,1,1
+filtro2_div		db  	14
+
+filtro3 		db 		1,1,2,2,-3,-3,-3,2,2,1,1
+filtro3_div		db  	9
+
+f_select		times 	11		db 	0
+f_select_div	db		0
+
+x_start			dw		0
+x_end			dw		0
+h_start			dw		0
 
 ;*************************************************************************
 segment stack stack
