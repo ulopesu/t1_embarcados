@@ -547,6 +547,7 @@ aplicar_filtro:
 		sub bx, 1
 		call min_ax_bx
 		mov[h_start], cx
+
 		mov ax, word[x_start]		; 	inicio loop_2
 		mov word[contador2], ax
 		l2_aplicar_filtro:
@@ -559,7 +560,10 @@ aplicar_filtro:
 		mov bx, word[qtd_pixels]
 		cmp word[contador], bx
 		jl l1_aplicar_filtro
-		ret
+		je volta_aplicar_filtro
+
+volta_aplicar_filtro:
+	ret
 
 conv_vin_filtro:
 	mov bx, word[h_start]
@@ -577,8 +581,8 @@ neg_cx:
 	ret
 
 aplicar_sn_cx:
-	mov cx, [v_in_sn + bx]
-	cmp cx, 0
+	mov dx, [v_in_sn + bx]
+	cmp dx, 0
 	jne neg_cx
 	ret
 
@@ -625,6 +629,9 @@ corrige_sn_vout_neg:
 set_sn_vout:
 	cmp byte[v_out_mod + bx], 0
 	jl corrige_sn_vout_neg
+	jnl set_sn_vout_pos
+
+set_sn_vout_pos:
 	mov byte[v_out_sn + bx], 0
 	ret
 
