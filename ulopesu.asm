@@ -352,17 +352,6 @@ volta_limpa:
 	pop ax
 	ret
 
-exit:
-	; mov    	ah,08h
-	; int     21h
-
-	mov  	ah,0   					; set video mode
-	mov  	al,[modo_anterior]   	; modo anterior
-	int  	10h
-
-	mov     ax,4C00H ; Exit to DOS function 
-	int     21h
-
 espera_mouse:
 		;mostrando mouse na tela
 		mov ax, 01h
@@ -376,6 +365,38 @@ espera_mouse:
 		cmp bx, 1
 		je verifica
 		jmp espera_mouse
+
+read_file:
+	cmp byte[aberto],1
+	je fecha_arq_sinal
+	mov byte[aberto], 1
+	call open_file
+	call le_numeros
+	call config_plotar_entrada
+	call plotar_vetor
+	jmp espera_mouse
+
+fecha_arq_sinal:
+	call close_file
+	mov word [aberto], 0
+	call limpar_area1
+	call read_file
+
+load_data:
+	cmp byte[aberto],0
+	je read_file
+	call le_numeros
+	call limpar_area1
+	call config_plotar_entrada
+	call plotar_vetor
+	jmp espera_mouse
+
+exit:
+	mov  	ah,0   					; set video mode
+	mov  	al,[modo_anterior]   	; modo anterior
+	int  	10h
+	mov     ax,4C00H
+	int     21h
 
 verifica:
 	;cx -> posicao horizontal do mouse
@@ -396,27 +417,7 @@ verifica:
 	jl exit			;sair  	   dx > 400
 	jmp espera_mouse
 
-read_file:
-	cmp byte[aberto],1
-	je fecha_arq_sinal
-	mov byte[aberto], 1
-	call open_file
-	call le_numeros
-	call config_plotar_entrada
-	call plotar_vetor
-	jmp espera_mouse
-
-load_data:
-	cmp byte[aberto],0
-	je read_file
-	call le_numeros
-	call limpar_area1
-	call config_plotar_entrada
-	call plotar_vetor
-	jmp espera_mouse
-
 run_fir1:
-	; copy filter 
 	mov word[contador], 0
 	loop_copy_f1:
 		mov bx, word[contador]
@@ -430,21 +431,48 @@ run_fir1:
 	mov byte[f_select_div], bl
 	call aplicar_filtro
 	call ajustar_vout
-	; call config_plotar_saida
-	; call plotar_vetor
+	call limpar_area2
+	call config_plotar_saida
+	call plotar_vetor
 	jmp espera_mouse
 
 run_fir2:
+	mov word[contador], 0
+	loop_copy_f2:
+		mov bx, word[contador]
+		mov cl, byte[filtro2 + bx]
+		mov byte[f_select + bx], cl
+		inc word[contador]
+		mov bx, word[contador]
+		cmp bl, byte[filtros_len]
+		jl loop_copy_f2
+	mov bl, byte[filtro2_div]
+	mov byte[f_select_div], bl
+	call aplicar_filtro
+	call ajustar_vout
+	call limpar_area2
+	call config_plotar_saida
+	call plotar_vetor
 	jmp espera_mouse
 
 run_fir3:
+	mov word[contador], 0
+	loop_copy_f3:
+		mov bx, word[contador]
+		mov cl, byte[filtro2 + bx]
+		mov byte[f_select + bx], cl
+		inc word[contador]
+		mov bx, word[contador]
+		cmp bl, byte[filtros_len]
+		jl loop_copy_f3
+	mov bl, byte[filtro2_div]
+	mov byte[f_select_div], bl
+	call aplicar_filtro
+	call ajustar_vout
+	call limpar_area2
+	call config_plotar_saida
+	call plotar_vetor
 	jmp espera_mouse
-
-fecha_arq_sinal:
-	call close_file
-	mov word [aberto], 0
-	call limpar_area1
-	call read_file
 
 open_file:
 	mov word[qtd_lida], 0  	; reseta a quantidade lida
@@ -636,6 +664,8 @@ set_sn_vout_pos:
 	ret
 
 set_mod_vout:
+	xor ah, ah
+	xor ch, ch
 	mov al, byte[v_out_mod + bx]
 	mov	cl, byte[f_select_div]
 	mov dx, 0
