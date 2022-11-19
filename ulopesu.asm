@@ -596,17 +596,20 @@ aplicar_filtro:
 volta_aplicar_filtro:
 	ret
 
-conv_vin_filtro:
-	mov bx, word[h_start]
+conv_vin_filtro:					; 	y[i] += h[h_start--] * x[j];
+	mov bx, word[h_start]			;   bx = h_start
 	xor ah, ah
-	mov al, byte[f_select + bx]
-	mov bx, word[contador2]
+	mov al, byte[f_select + bx]		;	ax = h[h_start]
+
+	mov bx, word[contador2]			; 	bx = j
 	xor ch, ch
-	mov cl, byte[v_in_mod + bx]
-	call aplicar_sn_cl			; aplicar o sinal [v_in_sn + bx] a cx
-	imul cl
-	add word[v_out_mod + bx], ax
-	dec word[h_start]			; decrementa h_start
+	mov cl, byte[v_in_mod + bx]		;	cl = mod(x[j])
+	call aplicar_sn_cl				;	cl = x[j]
+	imul cx
+
+	mov bx, word[contador]			; 	bx = i
+	add word[v_out_mod + bx], ax	;	y[i] += h[h_start] * x[j]
+	dec word[h_start]				; 	h_start--
 	ret
 
 neg_cl:
