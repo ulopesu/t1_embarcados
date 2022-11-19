@@ -552,31 +552,34 @@ get_sinal_and_convert:
 	je sinal_negativo
 	jne sinal_positivo
 
-;	f1[qtd_pixels] * f1[filtros_len]
 aplicar_filtro:
 	mov word[contador], 0
 	l1_aplicar_filtro:
 		mov bx, word[contador]
 		mov word[v_out_mod + bx], 0
-		mov ax,  0					;	set x_start
-		mov bx, word[filtros_len]
+		mov ax,  0						;	set x_start
+		mov bx, 0
+		mov bl, byte[filtros_len]
 		neg bx
 		add bx, word[contador]
 		add bx, 1
 		call max_ax_bx 
 		mov word[x_start], cx
-		mov ax, [contador]			;	set x_end
+
+		mov ax, word[contador]			;	set x_end
 		add ax, 1
-		mov bx, [qtd_pixels]
+		mov bx, word[qtd_pixels]
 		call min_ax_bx
 		mov word[x_end], cx
-		mov ax, word[contador]		;	set h_start
-		mov bx, [filtros_len]
+
+		mov ax, word[contador]			;	set h_start
+		mov bx, 0
+		mov bl, byte[filtros_len]
 		sub bx, 1
 		call min_ax_bx
 		mov[h_start], cx
 
-		mov ax, word[x_start]		; 	inicio loop_2
+		mov ax, word[x_start]			; 	inicio loop_2
 		mov word[contador2], ax
 		l2_aplicar_filtro:
 			call conv_vin_filtro
@@ -595,23 +598,25 @@ volta_aplicar_filtro:
 
 conv_vin_filtro:
 	mov bx, word[h_start]
-	mov ax, [f_select + bx]
+	xor ah, ah
+	mov al, byte[f_select + bx]
 	mov bx, word[contador2]
-	mov cx, [v_in_mod + bx]
-	call aplicar_sn_cx			; aplicar o sinal [v_in_sn + bx] a cx
-	imul cx
+	xor ch, ch
+	mov cl, byte[v_in_mod + bx]
+	call aplicar_sn_cl			; aplicar o sinal [v_in_sn + bx] a cx
+	imul cl
 	add word[v_out_mod + bx], ax
 	dec word[h_start]			; decrementa h_start
 	ret
 
-neg_cx:
-	neg cx
+neg_cl:
+	neg cl
 	ret
 
-aplicar_sn_cx:
-	mov dx, [v_in_sn + bx]
-	cmp dx, 0
-	jne neg_cx
+aplicar_sn_cl:
+	mov dl, byte[v_in_sn + bx]
+	cmp dl, 0
+	jne neg_cl
 	ret
 
 set_cx_ax:
@@ -649,13 +654,13 @@ ret_ajustar_vout:
 
 corrige_sn_vout_neg:
 	mov byte[v_out_sn + bx], 1
-	mov cl, byte[v_out_mod + bx]
-	neg cl
-	mov byte[v_out_mod + bx], cl
+	mov cx, word[v_out_mod + bx]
+	neg cx
+	mov word[v_out_mod + bx], cx
 	ret
 
 set_sn_vout:
-	cmp byte[v_out_mod + bx], 0
+	cmp word[v_out_mod + bx], 0
 	jl corrige_sn_vout_neg
 	jnl set_sn_vout_pos
 
@@ -664,13 +669,12 @@ set_sn_vout_pos:
 	ret
 
 set_mod_vout:
-	xor ah, ah
 	xor ch, ch
-	mov al, byte[v_out_mod + bx]
+	mov ax, word[v_out_mod + bx]
 	mov	cl, byte[f_select_div]
 	mov dx, 0
-	div cl
-	mov byte[v_out_mod + bx], al
+	div cx
+	mov word[v_out_mod + bx], ax
 	ret
 
 config_plotar_entrada:
@@ -678,8 +682,9 @@ config_plotar_entrada:
 	mov word[contador], 0
 	loop_config1:
 		mov bx, word[contador]
+		xor ah, ah
 		mov al, byte[v_in_mod + bx]
-		mov byte[v_select_mod + bx], al
+		mov word[v_select_mod + bx], ax
 		mov al, byte[v_in_sn + bx]
 		mov byte[v_select_sn + bx], al
 		inc word[contador]
@@ -692,8 +697,8 @@ config_plotar_saida:
 	mov word[contador], 0
 	loop_config2:
 		mov bx, word[contador]
-		mov al, byte[v_out_mod + bx]
-		mov byte[v_select_mod + bx], al
+		mov ax, word[v_out_mod + bx]
+		mov word[v_select_mod + bx], ax
 		mov al, byte[v_out_sn + bx]
 		mov byte[v_select_sn + bx], al
 		inc word[contador]
@@ -797,9 +802,9 @@ plot_num:
 	mov		ax, word[contador]
 	add		ax, 140
 	push	ax
-	call ajuste_ax
+	call 	ajuste_ax
 	push	ax
-	mov ax, 1
+	mov 	ax, 1
 	push	ax
 	call	full_circle
 	inc word[contador]
@@ -816,12 +821,14 @@ ajuste_ax:
 
 set_ax_positivo:
 	mov ax, word[ponto_central]
-	add al, byte[v_select_mod + bx]
+	mov dx, word[v_select_mod + bx]
+	add al, dl
 	ret
 
 set_ax_negativo:
 	mov ax, word[ponto_central]
-	sub al, byte[v_select_mod + bx]
+	mov dx, word[v_select_mod + bx]
+	sub al, dl
 	ret
 
 ;	imprime, em decimal, o valor númerico de AX 
@@ -863,7 +870,8 @@ print_dw_number:
 		mov     	dh, 7			;linha 0-29
 		mov     	dl, 6			;coluna 0-79
 		mov			byte[cor], branco_intenso
-		add			dl, byte[contador]
+		mov			bx, word[contador]
+		add			dl, bl
 
 		call	cursor
 		call	caracter
@@ -881,6 +889,7 @@ print_dw_number:
 		inc word[contador]
         dec cx			;decrease the count
         jmp print1
+
 volta_print:
 	pop dx
 	pop cx
@@ -1474,10 +1483,10 @@ qtd_pixels  	dw 		500
 v_in_mod 		times 	500 	db 	0  	; Vetor Módulo
 v_in_sn 		times 	500		db 	0  	; Vetor Sinal
 
-v_out_mod 		times 	500		db 	0  	; Vetor Módulo
+v_out_mod 		times 	500		dw 	0  	; Vetor Módulo
 v_out_sn 		times 	500		db 	0  	; Vetor Saída
 
-v_select_mod 	times 	500		db 	0  	; Vetor Módulo
+v_select_mod 	times 	500		dw 	0  	; Vetor Módulo
 v_select_sn		times 	500		db 	0  	; Vetor Saída
 
 ponto_central	dw 		0
