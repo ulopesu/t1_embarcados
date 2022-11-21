@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
     //     printf("%.2f) ", y[i]);
     // }
 
-    puts("");
+    fclose(ptr);
     free(h);
     free(y);
     return 0;
