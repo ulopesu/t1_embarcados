@@ -556,7 +556,9 @@ aplicar_filtro:
 	mov word[contador], 0
 	l1_aplicar_filtro:
 		mov bx, word[contador]
+		shl bx, 1
 		mov word[v_out_mod + bx], 0
+		shr bx, 1
 		mov ax,  0						;	set x_start
 		mov bx, 0
 		mov bl, byte[filtros_len]
@@ -608,7 +610,9 @@ conv_vin_filtro:					; 	y[i] += h[h_start--] * x[j];
 	imul cx
 
 	mov bx, word[contador]			; 	bx = i
+	shl bx, 1
 	add word[v_out_mod + bx], ax	;	y[i] += h[h_start] * x[j]
+	shr bx, 1
 	dec word[h_start]				; 	h_start--
 	ret
 
@@ -646,8 +650,7 @@ ajustar_vout:
 		mov bx, word[contador]
 		call set_sn_vout
 		call set_mod_vout
-		; fim loop_as_vout
-		inc word[contador]
+		inc word[contador]		; fim loop_as_vout
 		mov bx, word[qtd_pixels]
 		cmp word[contador], bx
 		jl loop_as_vout
@@ -657,13 +660,17 @@ ret_ajustar_vout:
 
 corrige_sn_vout_neg:
 	mov byte[v_out_sn + bx], 1
+	shl bx, 1
 	mov cx, word[v_out_mod + bx]
 	neg cx
 	mov word[v_out_mod + bx], cx
+	shr bx, 1
 	ret
 
 set_sn_vout:
+	shl bx, 1
 	cmp word[v_out_mod + bx], 0
+	shr bx, 1
 	jl corrige_sn_vout_neg
 	jnl set_sn_vout_pos
 
@@ -673,11 +680,13 @@ set_sn_vout_pos:
 
 set_mod_vout:
 	xor ch, ch
+	shl bx, 1
 	mov ax, word[v_out_mod + bx]
 	mov	cl, byte[f_select_div]
 	mov dx, 0
 	div cx
 	mov word[v_out_mod + bx], ax
+	shr bx, 1
 	ret
 
 config_plotar_entrada:
@@ -700,6 +709,7 @@ config_plotar_saida:
 	mov word[contador], 0
 	loop_config2:
 		mov bx, word[contador]
+		shl bx, 1
 		mov ax, word[v_out_mod + bx]
 		mov word[v_select_mod + bx], ax
 		mov al, byte[v_out_sn + bx]
