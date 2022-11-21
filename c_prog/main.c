@@ -77,12 +77,12 @@ int main(int argc, char *argv[])
 
     float *y = convolve(h, x, qtd_points, lenX, &lenY);
 
-    for (int i = 0; i < 10; i++)
-    {
-        printf("(%.2f : ", y[i]);
-        y[i] /= 11;
-        printf("%.2f) ", y[i]);
-    }
+    // for (int i = 0; i < 10; i++)
+    // {
+    //     printf("(%.2f : ", y[i]);
+    //     y[i] /= 11;
+    //     printf("%.2f) ", y[i]);
+    // }
 
     puts("");
     free(h);

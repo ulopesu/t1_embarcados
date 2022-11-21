@@ -606,7 +606,7 @@ conv_vin_filtro:					; 	y[i] += h[h_start--] * x[j];
 	mov bx, word[contador2]			; 	bx = j
 	xor ch, ch
 	mov cl, byte[v_in_mod + bx]		;	cl = mod(x[j])
-	call aplicar_sn_cl				;	cl = x[j]
+	; call aplicar_sn_cl				;	cl = x[j]	TODO: AJUSTAR ERROR!!!
 	imul cx
 
 	mov bx, word[contador]			; 	bx = i

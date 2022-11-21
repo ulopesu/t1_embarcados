@@ -8,6 +8,7 @@ float *convolve(float h[], float x[], int lenH, int lenX, int *lenY)
 
     float *y = (float *)calloc(nconv, sizeof(float));
 
+    int count = 1;
     for (i = 0; i < nconv; i++)
     {
         x_start = MAX(0, i - lenH + 1);
@@ -16,6 +17,10 @@ float *convolve(float h[], float x[], int lenH, int lenX, int *lenY)
         for (j = x_start; j < x_end; j++)
         {
             y[i] += h[h_start--] * x[j];
+            if(i==20){
+                printf("Count: %d\n", count);
+                count++;
+            }
         }
     }
     return y;
