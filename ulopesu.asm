@@ -606,7 +606,7 @@ conv_vin_filtro:					; 	y[i] += h[h_start--] * x[j];
 	mov bx, word[contador2]			; 	bx = j
 	xor ch, ch
 	mov cl, byte[v_in_mod + bx]		;	cl = mod(x[j])
-	; call aplicar_sn_cl				;	cl = x[j]	TODO: AJUSTAR ERROR!!!
+	call aplicar_sn_cx				;	cl = x[j]	TODO: AJUSTAR ERROR!!!
 	imul cx
 
 	mov bx, word[contador]			; 	bx = i
@@ -616,14 +616,14 @@ conv_vin_filtro:					; 	y[i] += h[h_start--] * x[j];
 	dec word[h_start]				; 	h_start--
 	ret
 
-neg_cl:
-	neg cl
+neg_cx:
+	neg cx
 	ret
 
-aplicar_sn_cl:
+aplicar_sn_cx:
 	mov dl, byte[v_in_sn + bx]
 	cmp dl, 0
-	jne neg_cl
+	jne neg_cx
 	ret
 
 set_cx_ax:
@@ -802,7 +802,15 @@ calc_dez:
 	pop ax                    ; volta aos valores originais
 	jmp cvt_retorna
 
+ajuste_sn:
+	mov bx, word[contador]
+	mov byte[v_in_sn + bx], 0
+	ret
+
 cvt_retorna:
+	mov bl, byte[v_in_mod + bx]
+	cmp bl, 0
+	je ajuste_sn
 	ret
 
 plotar_vetor:
