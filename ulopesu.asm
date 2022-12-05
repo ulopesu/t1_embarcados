@@ -1,6 +1,8 @@
-; vers�o de 10/05/2007
-; corrigido erro de arredondamento na rotina line.
-; circle e full_circle disponibilizados por Jefferson Moro em 10/2009
+; Trabalho de Sistemas Embarcados I
+; Usiel Ferreira Lopes Junior
+; 2022/1
+; Turma: 06.1
+
 ;
 segment code
 ..start:
@@ -374,6 +376,7 @@ read_file:
 	call le_numeros
 	call config_plotar_entrada
 	call plotar_vetor
+	call verifica_f_ativo
 	jmp espera_mouse
 
 fecha_arq_sinal:
@@ -389,7 +392,18 @@ load_data:
 	call limpar_area1
 	call config_plotar_entrada
 	call plotar_vetor
+	call verifica_f_ativo
 	jmp espera_mouse
+
+verifica_f_ativo:
+	mov al, byte[f_ativo]
+	cmp al, 3
+	je jmp_run_fir3
+	cmp al, 2
+	je jmp_run_fir2
+	cmp al, 1
+	je jmp_run_fir1
+	ret
 
 exit:
 	mov  	ah,0   					; set video mode
@@ -408,16 +422,26 @@ verifica:
 	cmp dx, 160
 	jl load_data	;load  	080 <= dx < 160
 	cmp dx, 240
-	jl run_fir1		;FIR3  	160 <= dx < 240
+	jl jmp_run_fir1		;FIR3  	160 <= dx < 240
 	cmp dx, 320
-	jl run_fir2		;FIR2  	240 <= dx < 320
+	jl jmp_run_fir2		;FIR2  	240 <= dx < 320
 	cmp dx, 400
-	jl run_fir3		;FIR1  	320 <= dx < 400
+	jl jmp_run_fir3		;FIR1  	320 <= dx < 400
 	cmp dx, 480
 	jl exit			;sair  	   dx > 400
 	jmp espera_mouse
 
+jmp_run_fir1:
+	jmp run_fir1
+
+jmp_run_fir2:
+	jmp run_fir2
+
+jmp_run_fir3:
+	jmp run_fir3
+
 run_fir1:
+	mov byte[f_ativo], 1
 	mov word[contador], 0
 	loop_copy_f1:
 		mov bx, word[contador]
@@ -437,6 +461,7 @@ run_fir1:
 	jmp espera_mouse
 
 run_fir2:
+	mov byte[f_ativo], 2
 	mov word[contador], 0
 	loop_copy_f2:
 		mov bx, word[contador]
@@ -456,6 +481,7 @@ run_fir2:
 	jmp espera_mouse
 
 run_fir3:
+	mov byte[f_ativo], 3
 	mov word[contador], 0
 	loop_copy_f3:
 		mov bx, word[contador]
@@ -519,11 +545,8 @@ le_numeros:
 		; verifica se os 500 números já foram lidos
 		cmp word[contador], bx
 		jne loop_le_numeros
-		je  volta_le_numeros
-
-volta_le_numeros:
-	call imprime_qtd_lida
-	ret
+		call imprime_qtd_lida
+		ret
 
 imprime_qtd_lida:
 	push ax
@@ -593,10 +616,7 @@ aplicar_filtro:
 		mov bx, word[qtd_pixels]
 		cmp word[contador], bx
 		jl l1_aplicar_filtro
-		je volta_aplicar_filtro
-
-volta_aplicar_filtro:
-	ret
+		ret
 
 conv_vin_filtro:					; 	y[i] += h[h_start--] * x[j];
 	mov bx, word[h_start]			;   bx = h_start
@@ -606,11 +626,12 @@ conv_vin_filtro:					; 	y[i] += h[h_start--] * x[j];
 	mov bx, word[contador2]			; 	bx = j
 	xor ch, ch
 	mov cl, byte[v_in_mod + bx]		;	cl = mod(x[j])
-	call aplicar_sn_cx				;	cl = x[j]	TODO: AJUSTAR ERROR!!!
+	call aplicar_sn_cx				;	cl = x[j]
 	imul cx
 
 	mov bx, word[contador]			; 	bx = i
 	shl bx, 1
+	; xor ah, ah
 	add word[v_out_mod + bx], ax	;	y[i] += h[h_start] * x[j]
 	shr bx, 1
 	dec word[h_start]				; 	h_start--
@@ -621,8 +642,7 @@ neg_cx:
 	ret
 
 aplicar_sn_cx:
-	mov dl, byte[v_in_sn + bx]
-	cmp dl, 0
+	cmp byte[v_in_sn + bx], 0
 	jne neg_cx
 	ret
 
@@ -654,9 +674,7 @@ ajustar_vout:
 		mov bx, word[qtd_pixels]
 		cmp word[contador], bx
 		jl loop_as_vout
-		je ret_ajustar_vout
-ret_ajustar_vout:
-	ret
+		ret
 
 corrige_sn_vout_neg:
 	mov byte[v_out_sn + bx], 1
@@ -696,10 +714,13 @@ config_plotar_entrada:
 		mov bx, word[contador]
 		xor ah, ah
 		mov al, byte[v_in_mod + bx]
+		shl bx, 1
 		mov word[v_select_mod + bx], ax
+		shr bx, 1
 		mov al, byte[v_in_sn + bx]
 		mov byte[v_select_sn + bx], al
 		inc word[contador]
+		mov bx, word[contador]
 		cmp bx, word[qtd_pixels]
 		jl loop_config1
 	mov word[ponto_central], 364
@@ -712,9 +733,11 @@ config_plotar_saida:
 		shl bx, 1
 		mov ax, word[v_out_mod + bx]
 		mov word[v_select_mod + bx], ax
+		shr bx, 1
 		mov al, byte[v_out_sn + bx]
 		mov byte[v_select_sn + bx], al
 		inc word[contador]
+		mov bx, word[contador]
 		cmp bx, word[qtd_pixels]
 		jl loop_config2
 	mov word[ponto_central], 133
@@ -815,7 +838,7 @@ cvt_retorna:
 
 plotar_vetor:
 	mov cx, word[qtd_pixels]
-	sub cx, 1
+	dec cx
 	mov word[contador], 0
 	mov	byte[cor],branco_intenso
 
@@ -834,21 +857,19 @@ plot_num:
 
 ajuste_ax:
 	mov bx, word[contador]
-	mov ax, 0
-	mov al, byte[v_select_sn + bx]
-	cmp al, 0
+	mov ax, word[ponto_central]
+	shl bx, 1
+	mov dx, word[v_select_mod + bx]
+	shr bx, 1
+	cmp byte[v_select_sn + bx], 0
 	je set_ax_positivo
 	jne set_ax_negativo
 
 set_ax_positivo:
-	mov ax, word[ponto_central]
-	mov dx, word[v_select_mod + bx]
 	add al, dl
 	ret
 
 set_ax_negativo:
-	mov ax, word[ponto_central]
-	mov dx, word[v_select_mod + bx]
 	sub al, dl
 	ret
 
@@ -1532,6 +1553,8 @@ f_select_div	db		0
 x_start			dw		0
 x_end			dw		0
 h_start			dw		0
+
+f_ativo			db		0
 
 ;*************************************************************************
 segment stack stack
