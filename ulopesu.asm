@@ -703,9 +703,19 @@ set_mod_vout:
 	mov	cl, byte[f_select_div]
 	mov dx, 0
 	div cx
+	call corrige_mod
 	mov word[v_out_mod + bx], ax
 	shr bx, 1
 	ret
+
+subax:
+	sub ax, 1745h
+	ret
+
+corrige_mod:
+	cmp ax, 00FFh
+	jg subax
+	ret 
 
 config_plotar_entrada:
 	;	Configurações para  a função plotar
@@ -870,7 +880,7 @@ set_ax_positivo:
 	ret
 
 set_ax_negativo:
-	sub al, dl
+	sub ax, dx
 	ret
 
 ;	imprime, em decimal, o valor númerico de AX 
