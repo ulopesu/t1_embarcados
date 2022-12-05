@@ -354,6 +354,42 @@ volta_limpa:
 	pop ax
 	ret
 
+limpa_marcadores:
+	mov     dh, 12			;linha 0-29
+	mov     dl, 12			;coluna 0-79
+	mov		byte[cor], preto
+	call	cursor
+	mov     al, 32
+	call	caracter
+
+	mov     dh, 17			;linha 0-29
+	mov     dl, 12			;coluna 0-79
+	mov		byte[cor], preto
+	call	cursor
+	mov     al, 32
+	call	caracter
+
+	mov     dh, 22			;linha 0-29
+	mov     dl, 12			;coluna 0-79
+	mov		byte[cor], preto
+	call	cursor
+	mov     al, 32
+	call	caracter
+	ret
+
+imprime_marcador:
+	cmp		byte[f_ativo], 0
+	je 		volta_imp
+	mov     dh, byte[linha_marcador]			;linha 0-29
+	mov     dl, 12								;coluna 0-79
+	mov		byte[cor], verde
+	call	cursor
+	mov     al, byte[marcador]
+	call	caracter
+
+volta_imp:
+	ret
+
 espera_mouse:
 		;mostrando mouse na tela
 		mov ax, 01h
@@ -395,6 +431,9 @@ load_data:
 	call verifica_f_ativo
 	jmp espera_mouse
 
+jmp_espera_mouse:
+	jmp espera_mouse
+
 verifica_f_ativo:
 	mov al, byte[f_ativo]
 	cmp al, 3
@@ -416,7 +455,7 @@ verifica:
 	;cx -> posicao horizontal do mouse
 	;dx -> posicao vertical do mouse	(INVERTIDO)
 	cmp cx, 140
-	jnl espera_mouse ;se o click ocorrer fora da barra de funcoes, nao faz nada e volta a esperar o mouse
+	jnl jmp_espera_mouse ;se o click ocorrer fora da barra de funcoes, nao faz nada e volta a esperar o mouse
 	cmp dx, 80
 	jl read_file	;abrir     	   dx < 80
 	cmp dx, 160
@@ -429,19 +468,40 @@ verifica:
 	jl jmp_run_fir3		;FIR1  	320 <= dx < 400
 	cmp dx, 480
 	jl exit			;sair  	   dx > 400
-	jmp espera_mouse
+	jmp jmp_espera_mouse
+
+check_run:
+	cmp byte[aberto],0
+	je jmp_espera_mouse
+	ret
+
+imp_mark:
+	call limpa_marcadores
+	call imprime_marcador
+	ret
 
 jmp_run_fir1:
+	call check_run
+	mov byte[f_ativo], 1
+	mov byte[linha_marcador], 12
+	call imp_mark
 	jmp run_fir1
 
 jmp_run_fir2:
+	call check_run
+	mov byte[f_ativo], 2
+	mov byte[linha_marcador], 17
+	call imp_mark
 	jmp run_fir2
 
 jmp_run_fir3:
+	call check_run
+	mov byte[f_ativo], 3
+	mov byte[linha_marcador], 22
+	call imp_mark
 	jmp run_fir3
 
 run_fir1:
-	mov byte[f_ativo], 1
 	mov word[contador], 0
 	loop_copy_f1:
 		mov bx, word[contador]
@@ -461,7 +521,6 @@ run_fir1:
 	jmp espera_mouse
 
 run_fir2:
-	mov byte[f_ativo], 2
 	mov word[contador], 0
 	loop_copy_f2:
 		mov bx, word[contador]
@@ -481,7 +540,6 @@ run_fir2:
 	jmp espera_mouse
 
 run_fir3:
-	mov byte[f_ativo], 3
 	mov word[contador], 0
 	loop_copy_f3:
 		mov bx, word[contador]
@@ -1518,6 +1576,7 @@ fir2_str    	db  	'FIR_2'
 fir3_str    	db  	'FIR_3'
 sair_str    	db  	'Sair'
 seta_str    	db  	'> > >'
+marcador    	db  	'#'
 
 filename 		db 		'sinal.txt',0
 handle 			dw 		0
@@ -1565,6 +1624,7 @@ x_end			dw		0
 h_start			dw		0
 
 f_ativo			db		0
+linha_marcador 	db  	0
 
 ;*************************************************************************
 segment stack stack
